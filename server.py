@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('Agg')  # ✅ используем безголовый режим, без Tkinter GUI
+matplotlib.use('Agg')  # Без GUI
 
 from flask import Flask, Response
 import socket
@@ -8,22 +8,19 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import io
 
-# ---------------- Flask Server ----------------
 app = Flask(__name__)
 
 UDP_IP = "0.0.0.0"
 UDP_PORT = 12345
 
-# UDP сокет для приема данных от ESP32
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((UDP_IP, UDP_PORT))
 
 partial_frame = []
 
 def get_frame():
-    """Получает UDP-кадры и рендерит тепловизор в PNG"""
     global partial_frame
-    print("🟡 Waiting for UDP frames from ESP32...")
+    print("🟡 Waiting for UDP frames...")
 
     while True:
         data, _ = sock.recvfrom(1024)
@@ -31,41 +28,45 @@ def get_frame():
             floats = list(map(float, data.decode().strip().split(",")))
             partial_frame.extend(floats)
 
-            # Один кадр = 32 x 24 = 768 пикселей
             if len(partial_frame) >= 768:
                 frame = np.array(partial_frame[:768], dtype=np.float32).reshape((24, 32))
                 partial_frame = partial_frame[768:]
 
-                # Настраиваем изображение
-                fig, ax = plt.subplots(figsize=(4, 3))
-                ax.axis('off')
-                im = ax.imshow(frame, cmap="inferno", interpolation="nearest")
-                fig.tight_layout(pad=0)
+                tmin = frame.min()
+                tmax = frame.max()
 
-                # Рендерим в буфер PNG
-                buf = io.BytesIO()
+                # Рисуем картинку
+                fig, ax = plt.subplots(figsize=(5, 4))
+                im = ax.imshow(frame, cmap="inferno", interpolation="nearest")
+                ax.axis('off')
+
+                # Подписи Tmin / Tmax
+                label = f"Tmin = {tmin:.1f}°C, Tmax = {tmax:.1f}°C"
+                ax.text(0.5, 0.0, label, transform=ax.transAxes,
+                        fontsize=10, ha='center', va='top', color='white',
+                        bbox=dict(boxstyle='round,pad=0.2', facecolor='black', alpha=0.6))
+
+                fig.tight_layout(pad=0)
                 canvas = FigureCanvas(fig)
+                buf = io.BytesIO()
                 canvas.print_png(buf)
                 plt.close(fig)
 
-                # Отправляем в MJPEG поток
                 yield (b'--frame\r\n'
                        b'Content-Type: image/png\r\n\r\n' + buf.getvalue() + b'\r\n')
-
         except Exception as e:
-            print("⚠️ Ошибка парсинга или потока:", e)
+            print("⚠️ Ошибка парсинга:", e)
 
 
 @app.route('/')
 def index():
-    """Главная страница"""
     return '''
     <html>
       <head><title>MLX90640 Thermal Stream</title></head>
       <body style="background:#000; color:#fff; text-align:center;">
         <h1>🔥 MLX90640 Thermal Camera</h1>
         <img src="/video" style="width:512px; image-rendering:pixelated; border:3px solid #444;">
-        <p>Streaming live from Jetson Nano</p>
+        <p>Streaming live with temperature overlay</p>
       </body>
     </html>
     '''
@@ -73,11 +74,9 @@ def index():
 
 @app.route('/video')
 def video():
-    """Отдаёт MJPEG видеопоток"""
     return Response(get_frame(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 if __name__ == '__main__':
     print("🟢 Flask server started at: http://192.168.1.97:5000/")
-    print("📡 Waiting for UDP packets on port 12345...")
     app.run(host='0.0.0.0', port=5000, threaded=True)
