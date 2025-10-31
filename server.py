@@ -1,14 +1,14 @@
 import matplotlib
 matplotlib.use('Agg')  # Без GUI
 
-from flask import Flask, Response
+from flask import Flask, Response, jsonify, render_template
 import socket
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import io
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', template_folder='templates')
 
 UDP_IP = "0.0.0.0"
 UDP_PORT = 12345
@@ -17,9 +17,11 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((UDP_IP, UDP_PORT))
 
 partial_frame = []
+latest_tmin = 0
+latest_tmax = 0
 
 def get_frame():
-    global partial_frame
+    global partial_frame, latest_tmin, latest_tmax
     print("🟡 Waiting for UDP frames...")
 
     while True:
@@ -32,16 +34,14 @@ def get_frame():
                 frame = np.array(partial_frame[:768], dtype=np.float32).reshape((24, 32))
                 partial_frame = partial_frame[768:]
 
-                tmin = frame.min()
-                tmax = frame.max()
+                latest_tmin = float(frame.min())
+                latest_tmax = float(frame.max())
 
-                # Рисуем картинку
                 fig, ax = plt.subplots(figsize=(5, 4))
                 im = ax.imshow(frame, cmap="inferno", interpolation="nearest")
                 ax.axis('off')
 
-                # Подписи Tmin / Tmax
-                label = f"Tmin = {tmin:.1f}°C, Tmax = {tmax:.1f}°C"
+                label = f"Tmin = {latest_tmin:.1f}°C, Tmax = {latest_tmax:.1f}°C"
                 ax.text(0.5, 0.0, label, transform=ax.transAxes,
                         fontsize=10, ha='center', va='top', color='white',
                         bbox=dict(boxstyle='round,pad=0.2', facecolor='black', alpha=0.6))
@@ -60,21 +60,17 @@ def get_frame():
 
 @app.route('/')
 def index():
-    return '''
-    <html>
-      <head><title>MLX90640 Thermal Stream</title></head>
-      <body style="background:#000; color:#fff; text-align:center;">
-        <h1>🔥 MLX90640 Thermal Camera</h1>
-        <img src="/video" style="width:512px; image-rendering:pixelated; border:3px solid #444;">
-        <p>Streaming live with temperature overlay</p>
-      </body>
-    </html>
-    '''
+    return render_template('index.html')
 
 
 @app.route('/video')
 def video():
     return Response(get_frame(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
+@app.route('/status')
+def status():
+    return jsonify({"tmin": latest_tmin, "tmax": latest_tmax})
 
 
 if __name__ == '__main__':
