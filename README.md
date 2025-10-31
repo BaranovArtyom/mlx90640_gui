@@ -4,3 +4,10 @@ Add http://192.168.1.97:5000/ in chrome://flags/#unsafely-treat-insecure-origin-
 
 Run 
 python server.py
+
+Adjust notify.js
+const minLimit = 20.0;
+const maxLimit = 58.0;
+
+
+Enjoy GUI http://192.168.1.97:5000/ with notifications
