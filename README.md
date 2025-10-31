@@ -1,0 +1,1 @@
+add http://192.168.1.97:5000/ in chrome://flags/#unsafely-treat-insecure-origin-as-secure 
