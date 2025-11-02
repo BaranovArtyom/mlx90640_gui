@@ -27,7 +27,14 @@ def get_frame():
     while True:
         data, _ = sock.recvfrom(1024)
         try:
-            floats = list(map(float, data.decode().strip().split(",")))
+            decoded = data.decode().strip()
+
+            # Если начинается с "S|", то сбрасываем буфер
+            if decoded.startswith("S|"):
+                partial_frame = []
+                decoded = decoded[2:]
+
+            floats = list(map(float, decoded.split(",")))
             partial_frame.extend(floats)
 
             if len(partial_frame) >= 768:

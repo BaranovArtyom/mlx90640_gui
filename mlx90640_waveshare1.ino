@@ -54,12 +54,17 @@ void loop() {
   // Отправим по 96 значений за раз (всего 768 точек => 8 пакетов)
   for (int i = 0; i < 768; i += 96) {
     String packet = "";
-    for (int j = 0; j < 96; j++) {
-      packet += String(frame[i + j], 2); // 2 знака после запятой
-      if (j < 95) packet += ",";         // запятые между числами
+
+    // Добавляем флаг начала кадра только в первый пакет
+    if (i == 0) {
+      packet += "S|";
     }
 
-    // Отправка по UDP
+    for (int j = 0; j < 96; j++) {
+      packet += String(frame[i + j], 2);
+      if (j != 95) packet += ",";
+    }
+
     udp.beginPacket(remoteIP, remotePort);
     udp.print(packet);
     udp.endPacket();
