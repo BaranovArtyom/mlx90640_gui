@@ -1,3 +1,5 @@
 numpy
 flask 
 matplotlib
+opencv-python
+requests

@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import io
+import cv2
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
@@ -29,7 +30,6 @@ def get_frame():
         try:
             decoded = data.decode().strip()
 
-            # Если начинается с "S|", то сбрасываем буфер
             if decoded.startswith("S|"):
                 partial_frame = []
                 decoded = decoded[2:]
@@ -44,23 +44,27 @@ def get_frame():
                 latest_tmin = float(frame.min())
                 latest_tmax = float(frame.max())
 
-                fig, ax = plt.subplots(figsize=(5, 4))
-                im = ax.imshow(frame, cmap="inferno", interpolation="nearest")
-                ax.axis('off')
+                # Normalize 0–255
+                norm = np.clip((frame - latest_tmin) / (latest_tmax - latest_tmin), 0, 1)
+                norm_uint8 = np.uint8(norm * 255)
 
-                label = f"Tmin = {latest_tmin:.1f}°C, Tmax = {latest_tmax:.1f}°C"
-                ax.text(0.5, 0.0, label, transform=ax.transAxes,
-                        fontsize=10, ha='center', va='top', color='white',
-                        bbox=dict(boxstyle='round,pad=0.2', facecolor='black', alpha=0.6))
+                # Resize and apply colormap
+                upscaled = cv2.resize(norm_uint8, (640, 480), interpolation=cv2.INTER_CUBIC)
+                colored = cv2.applyColorMap(upscaled, cv2.COLORMAP_INFERNO)
 
-                fig.tight_layout(pad=0)
-                canvas = FigureCanvas(fig)
-                buf = io.BytesIO()
-                canvas.print_png(buf)
-                plt.close(fig)
+                # Optional: add text
+                label = f"Tmin={latest_tmin:.1f}C, Tmax={latest_tmax:.1f}C"
+                cv2.putText(colored, label, (10, 25), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.7, (255, 255, 255), 2)
+
+                # Encode as JPEG
+                ret, jpeg = cv2.imencode('.jpg', colored)
+                if not ret:
+                    continue
 
                 yield (b'--frame\r\n'
-                       b'Content-Type: image/png\r\n\r\n' + buf.getvalue() + b'\r\n')
+                       b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
+
         except Exception as e:
             print("⚠️ Ошибка парсинга:", e)
 
