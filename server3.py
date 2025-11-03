@@ -60,7 +60,7 @@ def get_thermal_stream():
         thermal_colormap = cv2.resize(thermal_colormap, (640, 480), interpolation=cv2.INTER_NEAREST)
 
         # Добавим надпись
-        label = f"Tmin = {latest_tmin:.1f}°C, Tmax = {latest_tmax:.1f}°C"
+        label = f"Tmin = {latest_tmin:.1f} C, Tmax = {latest_tmax:.1f} C"
         cv2.putText(thermal_colormap, label, (10, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
                     (255, 255, 255), 2, cv2.LINE_AA)
 
@@ -88,7 +88,7 @@ def get_overlay_stream():
 
         overlaid = cv2.addWeighted(frame_cam, 1 - alpha, thermal_colormap, alpha, 0)
 
-        label = f"Tmin = {latest_tmin:.1f}°C, Tmax = {latest_tmax:.1f}°C"
+        label = f"Tmin = {latest_tmin:.1f} C, Tmax = {latest_tmax:.1f} C"
         cv2.putText(overlaid, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
                     (255, 255, 255), 2, cv2.LINE_AA)
 
